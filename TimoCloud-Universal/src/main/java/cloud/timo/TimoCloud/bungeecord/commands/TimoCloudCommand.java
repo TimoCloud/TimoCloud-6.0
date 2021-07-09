@@ -1,5 +1,11 @@
 package cloud.timo.TimoCloud.bungeecord.commands;
 
+import cloud.timo.TimoCloud.api.TimoCloudAPI;
+import cloud.timo.TimoCloud.api.objects.BaseObject;
+import cloud.timo.TimoCloud.api.objects.ServerGroupObject;
+import cloud.timo.TimoCloud.api.objects.ServerObject;
+import cloud.timo.TimoCloud.api.objects.ProxyGroupObject;
+import cloud.timo.TimoCloud.api.objects.ProxyObject;
 import cloud.timo.TimoCloud.bungeecord.TimoCloudBungee;
 import cloud.timo.TimoCloud.bungeecord.managers.BungeeMessageManager;
 import cloud.timo.TimoCloud.common.protocol.Message;
@@ -9,19 +15,35 @@ import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.plugin.Command;
 import net.md_5.bungee.api.plugin.PluginDescription;
+import net.md_5.bungee.api.plugin.TabExecutor;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-public class TimoCloudCommand extends Command {
+public class TimoCloudCommand extends Command implements TabExecutor {
 
-    private Map<String, CommandSender> senders;
+    private final Map<String, CommandSender> senders;
+    private Set<String> serverGroupNames;
+    private Set<String> serverNames;
+    private Set<String> proxyGroupNames;
+    private Set<String> proxyNames;
+    private Set<String> baseNames;
 
     public TimoCloudCommand() {
         super("TimoCloud", "timocloud.admin");
         senders = new HashMap<>();
+    }
+
+    public void loadNames() {
+        serverGroupNames = TimoCloudAPI.getUniversalAPI().getServerGroups().stream().map(ServerGroupObject::getName).collect(Collectors.toSet());
+        serverNames = TimoCloudAPI.getUniversalAPI().getServers().stream().map(ServerObject::getName).collect(Collectors.toSet());
+        proxyGroupNames = TimoCloudAPI.getUniversalAPI().getProxyGroups().stream().map(ProxyGroupObject::getName).collect(Collectors.toSet());
+        proxyNames = TimoCloudAPI.getUniversalAPI().getProxies().stream().map(ProxyObject::getName).collect(Collectors.toSet());
+        baseNames = TimoCloudAPI.getUniversalAPI().getBases().stream().map(BaseObject::getName).collect(Collectors.toSet());
     }
 
     @Override
@@ -84,4 +106,171 @@ public class TimoCloudCommand extends Command {
         return senders.get(name);
     }
 
+    @Override
+    public Iterable<String> onTabComplete(CommandSender commandSender, String[] strings) {
+        Set<String> tabCompletions = new HashSet<>();
+
+        if (commandSender.hasPermission("timocloud.admin")) {
+            switch (strings.length) {
+                case 1:
+                    addCompletionToList(tabCompletions, "help", strings[0]);
+                    addCompletionToList(tabCompletions, "version", strings[0]);
+                    addCompletionToList(tabCompletions, "reload", strings[0]);
+                    addCompletionToList(tabCompletions, "reloadplugins", strings[0]);
+                    addCompletionToList(tabCompletions, "addbase", strings[0]);
+                    addCompletionToList(tabCompletions, "addgroup", strings[0]);
+                    addCompletionToList(tabCompletions, "removegroup", strings[0]);
+                    addCompletionToList(tabCompletions, "editgroup", strings[0]);
+                    addCompletionToList(tabCompletions, "restart", strings[0]);
+                    addCompletionToList(tabCompletions, "groupinfo", strings[0]);
+                    addCompletionToList(tabCompletions, "listgroups", strings[0]);
+                    addCompletionToList(tabCompletions, "baseinfo", strings[0]);
+                    addCompletionToList(tabCompletions, "listbases", strings[0]);
+                    addCompletionToList(tabCompletions, "sendcommand", strings[0]);
+                    addCompletionToList(tabCompletions, "check", strings[0]);
+                    addCompletionToList(tabCompletions, "shutdown", strings[0]);
+                    break;
+                case 2:
+                    switch (strings[0].toLowerCase()) {
+                        case "addgroup":
+                            addCompletionToList(tabCompletions, "server", strings[1]);
+                            addCompletionToList(tabCompletions, "proxy", strings[1]);
+                            break;
+                        case "removegroup":
+                        case "editgroup":
+                        case "groupinfo":
+                            addServerGroupCompletions(strings[1], tabCompletions);
+                            addProxyGroupCompletions(strings[1], tabCompletions);
+                            break;
+                        case "restart":
+                            addServerGroupCompletions(strings[1], tabCompletions);
+                            addServerCompletions(strings[1], tabCompletions);
+                            addProxyGroupCompletions(strings[1], tabCompletions);
+                            addProxyCompletions(strings[1], tabCompletions);
+                            addBaseCompletions(strings[1], tabCompletions);
+                            break;
+                        case "baseinfo":
+                            addBaseCompletions(strings[1], tabCompletions);
+                            break;
+                        case "sendcommand":
+                            addServerCompletions(strings[1], tabCompletions);
+                            addProxyCompletions(strings[1], tabCompletions);
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                case 3:
+                    if (strings[0].equalsIgnoreCase("editgroup")) {
+                        ProxyGroupObject proxyGroupObject = TimoCloudAPI.getUniversalAPI().getProxyGroup(strings[1]);
+                        ServerGroupObject serverGroupObject = TimoCloudAPI.getUniversalAPI().getServerGroup(strings[1]);
+
+                        if (proxyGroupObject != null) {
+                            addCompletionToList(tabCompletions, "minamount", strings[2]);
+                            addCompletionToList(tabCompletions, "maxamount", strings[2]);
+                            addCompletionToList(tabCompletions, "ram", strings[2]);
+                            addCompletionToList(tabCompletions, "static", strings[2]);
+                            addCompletionToList(tabCompletions, "base", strings[2]);
+                            addCompletionToList(tabCompletions, "priority", strings[2]);
+                            addCompletionToList(tabCompletions, "playersperproxy", strings[2]);
+                            addCompletionToList(tabCompletions, "keepfreeslots", strings[2]);
+                            addCompletionToList(tabCompletions, "maxplayers", strings[2]);
+                        }
+                        if (serverGroupObject != null) {
+                            addCompletionToList(tabCompletions, "onlineamount", strings[2]);
+                            addCompletionToList(tabCompletions, "ram", strings[2]);
+                            addCompletionToList(tabCompletions, "static", strings[2]);
+                            addCompletionToList(tabCompletions, "base", strings[2]);
+                            addCompletionToList(tabCompletions, "priority", strings[2]);
+                        }
+                    }
+                    break;
+                case 4:
+                    switch (strings[2].toLowerCase()) {
+                        case "ram":
+                            addCompletionToList(tabCompletions, "512", strings[3]);
+                            addCompletionToList(tabCompletions, "1024", strings[3]);
+                            addCompletionToList(tabCompletions, "2048", strings[3]);
+                            addCompletionToList(tabCompletions, "4096", strings[3]);
+                            addCompletionToList(tabCompletions, "8192", strings[3]);
+                            break;
+                        case "base":
+                            for (BaseObject baseObject : TimoCloudAPI.getUniversalAPI().getBases()) {
+                                addCompletionToList(tabCompletions, baseObject.getName(), strings[3]);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                default:
+                    break;
+            }
+        }
+        return tabCompletions;
+    }
+
+    private void addServerGroupCompletions(String s, Set<String> list) {
+        serverGroupNames.forEach(serverGroupName -> addCompletionToList(list, serverGroupName, s));
+    }
+
+    private void addServerCompletions(String s, Set<String> list) {
+        serverNames.forEach(serverName -> addCompletionToList(list, serverName, s));
+    }
+
+    private void addProxyGroupCompletions(String s, Set<String> list) {
+        proxyGroupNames.forEach(proxyGroupName -> addCompletionToList(list, proxyGroupName, s));
+    }
+
+    private void addProxyCompletions(String s, Set<String> list) {
+        proxyNames.forEach(proxyName -> addCompletionToList(list, proxyName, s));
+    }
+
+    private void addBaseCompletions(String s, Set<String> list) {
+        baseNames.forEach(baseName -> addCompletionToList(list, baseName, s));
+    }
+
+    private void addCompletionToList(Set<String> set, String completion, String s) {
+        if (completion.startsWith(s))
+            set.add(completion);
+    }
+
+    public void addServerGroupName(String name) {
+        serverGroupNames.add(name);
+    }
+
+    public void addServerName(String name) {
+        serverNames.add(name);
+    }
+
+    public void addProxyGroupName(String name) {
+        proxyGroupNames.add(name);
+    }
+
+    public void addProxyName(String name) {
+        proxyNames.add(name);
+    }
+
+    public void addBaseName(String name) {
+        baseNames.add(name);
+    }
+
+    public void removeServerGroupName(String name) {
+        serverGroupNames.remove(name);
+    }
+
+    public void removeServerName(String name) {
+        serverNames.remove(name);
+    }
+
+    public void removeProxyGroupName(String name) {
+        proxyGroupNames.remove(name);
+    }
+
+    public void removeProxyName(String name) {
+        proxyNames.remove(name);
+    }
+
+    public void removeBaseName(String name) {
+        baseNames.remove(name);
+    }
 }
